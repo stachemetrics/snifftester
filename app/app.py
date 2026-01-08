@@ -1,19 +1,30 @@
+import os
 import gradio as gr
+from google import genai
 
-def hello(text):
-    """Placeholder function - will become snifftest later."""
-    return f"Hello! You entered: {text}"
+def create_app():
+    """Create and return the Gradio blocks."""
+    
+    client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
 
-def create_demo():
-    """Create and return the Gradio demo."""
+    def analyze(text):
+        if not text.strip():
+            return "Please enter some text to analyze."
+        
+        response = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=f"Summarize this in one sentence: {text}"
+        )
+        return response.text
+
     demo = gr.Interface(
-        fn=hello,
-        inputs=gr.Textbox(label="Enter some text"),
-        outputs=gr.Textbox(label="Output"),
-        title="Snifftest - Hello World",
-        description="Testing Modal deployment"
+        fn=analyze,
+        inputs=gr.Textbox(label="Enter text", lines=5),
+        outputs=gr.Textbox(label="Gemini response"),
+        title="Snifftest - Gemini Test",
+        description="Testing Gemini API integration"
     )
-    demo.queue()
+
     return demo
 
 # For local testing: python app.py

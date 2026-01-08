@@ -2,19 +2,16 @@ import modal
 
 app = modal.App("snifftest")
 
-image = modal.Image.debian_slim(python_version="3.12").pip_install(
-    "fastapi[standard]",
-    "gradio",
-    "google-genai",
-    "requests",
+image = (
+    modal.Image.debian_slim(python_version="3.12")
+    .pip_install(
+        "fastapi[standard]",
+        "gradio",
+        "google-genai",
+        "requests",
+    )
+    .add_local_file("app.py", "/root/app.py")
 )
-
-with image.imports():
-    import os
-    import gradio as gr
-    from gradio.routes import mount_gradio_app
-    from fastapi import FastAPI
-    from google import genai
 
 @app.function(
     image=image,
@@ -24,26 +21,14 @@ with image.imports():
 @modal.concurrent(max_inputs=100)
 @modal.asgi_app()
 def ui():
-    """Snifftest Gradio app."""
+    """Serve the Gradio app."""
+    import sys
+    sys.path.insert(0, "/root")
     
-    client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+    from fastapi import FastAPI
+    from gradio.routes import mount_gradio_app
+    from app import create_app
 
-    def analyze(text):
-        if not text.strip():
-            return "Please enter some text to analyze."
-        
-        response = client.models.generate_content(
-            model="gemini-2.0-flash",
-            contents=f"Summarize this in one sentence: {text}"
-        )
-        return response.text
-
-    demo = gr.Interface(
-        fn=analyze,
-        inputs=gr.Textbox(label="Enter text", lines=5),
-        outputs=gr.Textbox(label="Gemini response"),
-        title="Snifftest - Gemini Test",
-        description="Testing Gemini API integration"
-    )
-
+    demo = create_app()
+    
     return mount_gradio_app(app=FastAPI(), blocks=demo, path="/")
