@@ -7,6 +7,11 @@ from dataclasses import dataclass, asdict
 import gradio as gr
 from google import genai
 from google.genai import types
+from dotenv import load_dotenv
+
+load_dotenv()
+
+MODEL = "gemini-2.5-flash"
 
 # ============== LOGGING ==============
 
@@ -159,7 +164,7 @@ def extract_references(text: str, session_id: str, volume=None) -> tuple[list[di
     prompt_content = EXTRACTION_PROMPT.format(text=text)
     
     response = get_client().models.generate_content(
-        model="gemini-2.0-flash",
+        model=MODEL,
         contents=prompt_content
     )
     
@@ -169,7 +174,7 @@ def extract_references(text: str, session_id: str, volume=None) -> tuple[list[di
     log = LLMLog(
         timestamp=datetime.now().isoformat(),
         session_id=session_id,
-        model="gemini-2.0-flash",
+        model=MODEL,
         task="extract_references",
         prompt_template="EXTRACTION_PROMPT",
         prompt_content=prompt_content,
@@ -181,6 +186,8 @@ def extract_references(text: str, session_id: str, volume=None) -> tuple[list[di
     append_log(log, volume)
     
     try:
+        if not response.text:
+            return [], log
         clean = response.text.strip()
         if clean.startswith("```json"):
             clean = clean[7:]
@@ -199,7 +206,7 @@ def verify_reference(reference: dict, session_id: str, volume=None) -> tuple[dic
     prompt_content = CRAAP_PROMPT.format(reference_json=json.dumps(reference, indent=2))
     
     response = get_client().models.generate_content(
-        model="gemini-2.0-flash",
+        model=MODEL,
         contents=prompt_content,
         config=types.GenerateContentConfig(
             tools=[types.Tool(google_search=types.GoogleSearch())]
@@ -212,7 +219,7 @@ def verify_reference(reference: dict, session_id: str, volume=None) -> tuple[dic
     log = LLMLog(
         timestamp=datetime.now().isoformat(),
         session_id=session_id,
-        model="gemini-2.0-flash",
+        model=MODEL,
         task="verify_reference",
         prompt_template="CRAAP_PROMPT",
         prompt_content=prompt_content,
@@ -224,6 +231,8 @@ def verify_reference(reference: dict, session_id: str, volume=None) -> tuple[dic
     append_log(log, volume)
     
     try:
+        if not response.text:
+            return {"overall_score": None, "summary": "No response from model", "red_flags": []}, log
         clean = response.text.strip()
         if clean.startswith("```json"):
             clean = clean[7:]
@@ -247,7 +256,7 @@ def generate_snarky_summary(verified_refs: list[dict], snifftest: dict, session_
     )
     
     response = get_client().models.generate_content(
-        model="gemini-2.0-flash",
+        model=MODEL,
         contents=prompt_content
     )
     
@@ -257,7 +266,7 @@ def generate_snarky_summary(verified_refs: list[dict], snifftest: dict, session_
     log = LLMLog(
         timestamp=datetime.now().isoformat(),
         session_id=session_id,
-        model="gemini-2.0-flash",
+        model=MODEL,
         task="generate_summary",
         prompt_template="SNIFFTEST_SUMMARY_PROMPT",
         prompt_content=prompt_content,
@@ -443,18 +452,13 @@ def create_app(volume=None):
         ---
         """)
         
-        with gr.Row():
-            with gr.Column(scale=1):
-                input_text = gr.Textbox(
-                    label="📝 Paste AI-generated text",
-                    placeholder="Paste the AI response you want to fact-check...",
-                    lines=12,
-                )
-                submit_btn = gr.Button("👃 Sniff It!", variant="primary", size="lg")
-            
-            with gr.Column(scale=1):
-                status = gr.Markdown(label="Status", value="*Waiting for input...*")
-        
+        input_text = gr.Textbox(
+            label="📝 Paste AI-generated text",
+            placeholder="Paste the AI response you want to fact-check...",
+            lines=12,
+        )
+        submit_btn = gr.Button("👃 Sniff It!", variant="primary", size="lg")
+        status = gr.Textbox(label="Status", value="Waiting for input...", lines=2, interactive=False)
         result = gr.Markdown(label="Results")
         
         submit_btn.click(
@@ -471,3 +475,6 @@ def create_app(volume=None):
         """)
     
     return demo
+
+if __name__ == "__main__":
+    create_app().launch()

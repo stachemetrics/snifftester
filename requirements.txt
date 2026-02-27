@@ -1,0 +1,9 @@
+# app dependencies (Modal container)
+gradio
+fastapi[standard]
+google-genai
+requests
+
+# local dev
+modal
+python-dotenv

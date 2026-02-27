@@ -9,7 +9,7 @@ image = (
     modal.Image.debian_slim(python_version="3.12")
     .pip_install("google-genai")
     .pip_install("gradio", "fastapi[standard]", "requests")
-    .add_local_file("app.py", "/root/app.py")
+    .add_local_file("app/app.py", "/root/app.py")
 )
 
 @app.function(
